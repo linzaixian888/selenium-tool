@@ -431,7 +431,7 @@ public class BrowserAutomationService {
             throw new IllegalStateException("浏览器自动化任务被中断", ex);
         }
     }
-    private final String[] FAIL_TITLE = {"登录", "登録", "异地", "2fa", "Login"};
+    private final String[] FAIL_TITLE = {"登录", "登録","登錄","异地", "2fa", "Login"};
     private final String[] SUCCESS_TITLE = {"首页", "首頁"};
     private final String[] SUCCESS_PAGE = {"首页", "首頁", "Torrents", "种子"};
 
