@@ -23,7 +23,7 @@
 hs_err_pid*
 replay_pid*
 target/
-config/
+config/*.json
 .idea/workspace.xml
 *.iml
 cookiecloud-cache.json
