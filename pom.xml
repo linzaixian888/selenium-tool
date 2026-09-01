@@ -96,7 +96,17 @@
                     </to>
                     <!-- 2. 配置基础镜像 -->
                     <from>
-                        <image>selenium/standalone-chrome:latest</image>
+                        <image>selenium/standalone-chromium:latest</image>
+                        <platforms>
+                            <platform>
+                                <architecture>amd64</architecture>
+                                <os>linux</os>
+                            </platform>
+                            <platform>
+                                <architecture>arm64</architecture>
+                                <os>linux</os>
+                            </platform>
+                        </platforms>
                     </from>
                     <!-- 3. 容器配置 (WORKDIR, ENV, EXPOSE, ENTRYPOINT) -->
                     <container>

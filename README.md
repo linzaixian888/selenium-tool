@@ -2,6 +2,8 @@
 
 基于 Java、Spring Boot、Selenium 的定时浏览器任务工具，支持从 CookieCloud 拉取 Cookie，并通过 webhook 发送启动结果和异常告警。
 
+Docker 镜像支持 `linux/amd64` 和 `linux/arm64`，拉取同一标签时 Docker 会自动选择当前主机对应的架构。由于 Google Chrome 不提供 Linux/ARM64 版本，容器内统一使用与 ChromeDriver 兼容的 Chromium。
+
 ## 配置示例
 
 
@@ -28,7 +30,7 @@ automation:
     webhook-url:
 ```
 
-### `ddocker-compose.yml` 
+### `docker-compose.yml`
 ```yaml
 services:
   selenium-tool:
