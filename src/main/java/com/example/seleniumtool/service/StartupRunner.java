@@ -28,7 +28,7 @@ public class StartupRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (properties.isRunOnStartup()) {
-            browserAutomationService.executeOnce();
+            browserAutomationService.executeOnce("启动时执行");
         }
         webhookNotificationService.sendOrThrow("启动成功", buildStartupSummary());
     }
@@ -37,9 +37,6 @@ public class StartupRunner implements ApplicationRunner {
         StringBuilder content = new StringBuilder(properties.getStartupNotification().getMessage());
         for (String warning : automationAlertState.drainStartupWarnings()) {
             content.append("\n\n告警:\n").append(warning);
-        }
-        for (String failure : automationAlertState.drainTargetFailures()) {
-            content.append("\n\n打开失败:\n").append(failure);
         }
         return content.toString();
     }

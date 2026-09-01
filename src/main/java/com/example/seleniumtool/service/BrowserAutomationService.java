@@ -85,11 +85,20 @@ public class BrowserAutomationService {
     }
 
     public boolean executeOnce() {
+        return executeOnce("目标执行");
+    }
+
+    public boolean executeOnce(String notificationName) {
         if (!acquireExecution()) {
             return false;
         }
+        List<AutomationProperties.Target> targets = List.copyOf(properties.getTargets());
         try {
-            doExecuteOnce();
+            executeTargetTask(
+                    targets,
+                    notificationName,
+                    () -> doExecuteTargets(targets, notificationName + "任务")
+            );
             return true;
         } finally {
             running.set(false);
@@ -100,10 +109,15 @@ public class BrowserAutomationService {
         if (!acquireExecution()) {
             return false;
         }
+        List<AutomationProperties.Target> targets = List.copyOf(properties.getTargets());
         try {
             executor.execute(() -> {
                 try {
-                    doExecuteOnce();
+                    executeTargetTask(
+                            targets,
+                            "立即执行",
+                            () -> doExecuteTargets(targets, "立即执行任务")
+                    );
                 } finally {
                     running.set(false);
                 }
@@ -129,7 +143,11 @@ public class BrowserAutomationService {
         try {
             executor.execute(() -> {
                 try {
-                    doExecuteTarget(target);
+                    executeTargetTask(
+                            List.of(target),
+                            "目标单独重试",
+                            () -> doExecuteTarget(target)
+                    );
                 } finally {
                     running.set(false);
                 }
@@ -162,7 +180,11 @@ public class BrowserAutomationService {
                     .toList();
             executor.execute(() -> {
                 try {
-                    doExecuteTargets(retryTargets, "失败目标重试任务");
+                    executeTargetTask(
+                            retryTargets,
+                            "失败目标重试",
+                            () -> doExecuteTargets(retryTargets, "失败目标重试任务")
+                    );
                 } finally {
                     running.set(false);
                 }
@@ -185,6 +207,65 @@ public class BrowserAutomationService {
                 .toList();
     }
 
+    private void executeTargetTask(
+            List<AutomationProperties.Target> targets,
+            String notificationName,
+            Runnable task
+    ) {
+        Map<String, TargetRunHistoryService.TargetRunRecord> previous =
+                targetRunHistoryService.getLatestHistories();
+        RuntimeException taskFailure = null;
+        try {
+            task.run();
+        } catch (RuntimeException ex) {
+            taskFailure = ex;
+            throw ex;
+        } finally {
+            sendTargetTaskNotification(targets, notificationName, previous, taskFailure);
+            automationAlertState.drainTargetFailures();
+        }
+    }
+
+    private void sendTargetTaskNotification(
+            List<AutomationProperties.Target> targets,
+            String notificationName,
+            Map<String, TargetRunHistoryService.TargetRunRecord> previous,
+            RuntimeException taskFailure
+    ) {
+        Map<String, TargetRunHistoryService.TargetRunRecord> latest =
+                targetRunHistoryService.getLatestHistories();
+        List<AutomationProperties.Target> failedTargets = targets.stream()
+                .filter(target -> {
+                    TargetRunHistoryService.TargetRunRecord record = latest.get(target.getUrl());
+                    return record == null
+                            || record.equals(previous.get(target.getUrl()))
+                            || !record.success();
+                })
+                .toList();
+        int successCount = targets.size() - failedTargets.size();
+        String status = taskFailure == null && failedTargets.isEmpty()
+                ? notificationName + "完成"
+                : notificationName + "完成（存在失败）";
+        StringBuilder content = new StringBuilder(notificationName).append("任务已结束")
+                .append("\n目标数: ").append(targets.size())
+                .append("\n成功: ").append(successCount)
+                .append("\n失败: ").append(failedTargets.size());
+        if (taskFailure != null) {
+            content.append("\n异常: ").append(buildFailureMessage(taskFailure));
+        }
+        if (!failedTargets.isEmpty()) {
+            content.append("\n\n失败目标:");
+            for (AutomationProperties.Target target : failedTargets) {
+                TargetRunHistoryService.TargetRunRecord record = latest.get(target.getUrl());
+                boolean executed = record != null && !record.equals(previous.get(target.getUrl()));
+                content.append("\n目标: ").append(target.getName())
+                        .append("\nURL: ").append(target.getUrl())
+                        .append("\n原因: ").append(executed ? record.message() : "本次任务未生成运行记录");
+            }
+        }
+        webhookNotificationService.send(status, content.toString());
+    }
+
     public boolean isRunning() {
         return running.get();
     }
@@ -196,10 +277,6 @@ public class BrowserAutomationService {
         log.info(TASK_RUNNING_MESSAGE);
         webhookNotificationService.send("任务仍在执行中", TASK_RUNNING_MESSAGE);
         return false;
-    }
-
-    private void doExecuteOnce() {
-        doExecuteTargets(List.copyOf(properties.getTargets()), "浏览器自动化任务");
     }
 
     private void doExecuteTargets(List<AutomationProperties.Target> targets, String taskName) {
